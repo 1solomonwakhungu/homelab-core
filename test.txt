@@ -1,0 +1,3 @@
+This is a test change to the homelab-core repository.
+
+This file was created as part of testing the branch and PR functionality.
