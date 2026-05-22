@@ -1,0 +1,15 @@
+flowchart LR
+  users["Users and devices"]
+  edge["Edge routing layer\nTODO: verify implementation"]
+  core["Core platform services"]
+  workloads["Homelab workloads\nTODO: inventory services"]
+  observability["Observability stack\nPrometheus / Grafana examples"]
+  backup["Backup storage\nTODO: verify target"]
+  alerts["Alert receivers\nPLACEHOLDER only"]
+
+  users --> edge
+  edge --> core
+  core --> workloads
+  core --> observability
+  core --> backup
+  observability --> alerts
