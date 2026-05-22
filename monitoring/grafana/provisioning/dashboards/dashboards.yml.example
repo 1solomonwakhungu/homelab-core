@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: homelab-core
+    orgId: 1
+    folder: Homelab Core
+    type: file
+    disableDeletion: false
+    editable: false
+    options:
+      path: /var/lib/grafana/dashboards/homelab-core
