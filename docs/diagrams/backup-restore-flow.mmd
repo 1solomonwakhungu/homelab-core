@@ -1,0 +1,13 @@
+flowchart TD
+  service["Service with persistent data"]
+  snapshot["Backup snapshot or archive"]
+  storage["Backup storage\nTODO: verify provider"]
+  testrestore["Isolated restore target"]
+  validation["Health and integrity checks"]
+  production["Production promotion\nonly after validation"]
+
+  service --> snapshot
+  snapshot --> storage
+  storage --> testrestore
+  testrestore --> validation
+  validation --> production
