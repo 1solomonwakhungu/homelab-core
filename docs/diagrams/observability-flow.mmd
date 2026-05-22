@@ -1,0 +1,11 @@
+flowchart LR
+  targets["Service targets\n/exporters and /metrics"]
+  prometheus["Prometheus\nscrape and rule evaluation"]
+  alertmanager["Alertmanager\nrouting and grouping"]
+  grafana["Grafana\ndashboards"]
+  receivers["Private alert receivers\nnot stored in repo"]
+
+  targets --> prometheus
+  prometheus --> alertmanager
+  prometheus --> grafana
+  alertmanager --> receivers

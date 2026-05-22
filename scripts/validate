@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+STRICT="${VALIDATE_STRICT:-0}"
+failures=0
+
+log() {
+  printf '%s\n' "$*"
+}
+
+record_failure() {
+  log "ERROR: $*"
+  failures=$((failures + 1))
+}
+
+run_optional() {
+  local tool="$1"
+  shift
+
+  if command -v "$tool" >/dev/null 2>&1; then
+    log "Running $tool..."
+    "$@"
+    return
+  fi
+
+  if [ "$STRICT" = "1" ]; then
+    record_failure "$tool is required when VALIDATE_STRICT=1"
+  else
+    log "Skipping $tool; install it for stronger local validation."
+  fi
+}
+
+required_files=(
+  README.md
+  SECURITY.md
+  CONTRIBUTING.md
+  CHANGELOG.md
+  docs/architecture.md
+  docs/service-inventory.md
+  docs/operations/logging-alerting.md
+  docs/operations/backup-restore.md
+  docs/runbooks/alert-triage.md
+  docs/runbooks/network-incident.md
+  docs/runbooks/observability-no-data.md
+  docs/runbooks/restore-from-backup.md
+  docs/runbooks/service-onboarding.md
+  docs/diagrams/platform-overview.mmd
+  docs/diagrams/observability-flow.mmd
+  docs/diagrams/backup-restore-flow.mmd
+  monitoring/prometheus/prometheus.yml.example
+  monitoring/prometheus/alerts/homelab-core.rules.yml
+  monitoring/alertmanager/alertmanager.yml.example
+  monitoring/grafana/provisioning/datasources/prometheus.yml.example
+  monitoring/grafana/provisioning/dashboards/dashboards.yml.example
+  monitoring/grafana/dashboards/homelab-core-overview.json
+)
+
+log "Checking required files..."
+for path in "${required_files[@]}"; do
+  if [ ! -s "$path" ]; then
+    record_failure "required file is missing or empty: $path"
+  fi
+done
+
+log "Checking Mermaid diagram declarations..."
+while IFS= read -r diagram; do
+  if ! grep -Eq '^(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt)' "$diagram"; then
+    record_failure "Mermaid diagram has no recognized declaration: $diagram"
+  fi
+done < <(find docs/diagrams -type f -name '*.mmd' | sort)
+
+run_optional markdownlint-cli2 markdownlint-cli2 '**/*.md'
+
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN=python3
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_BIN=python
+else
+  PYTHON_BIN=
+fi
+
+yaml_files=()
+while IFS= read -r -d '' yaml_file; do
+  yaml_files+=("$yaml_file")
+done < <(
+  find . -type f \
+    \( -name '*.yml' -o -name '*.yaml' -o -name '*.yml.example' \) \
+    -not -path './.git/*' \
+    -print0 | sort -z
+)
+
+if [ "${#yaml_files[@]}" -gt 0 ]; then
+  if command -v yamllint >/dev/null 2>&1; then
+    log "Running yamllint..."
+    yamllint "${yaml_files[@]}"
+  elif command -v python3 >/dev/null 2>&1 && python3 -m yamllint --version >/dev/null 2>&1; then
+    log "Running yamllint through python3..."
+    python3 -m yamllint "${yaml_files[@]}"
+  elif command -v python >/dev/null 2>&1 && python -m yamllint --version >/dev/null 2>&1; then
+    log "Running yamllint through python..."
+    python -m yamllint "${yaml_files[@]}"
+  elif [ "$STRICT" = "1" ]; then
+    record_failure "yamllint is required when VALIDATE_STRICT=1"
+  else
+    log "Skipping yamllint; install it for stronger local validation."
+  fi
+fi
+
+run_optional shellcheck shellcheck scripts/validate
+
+if [ -n "$PYTHON_BIN" ]; then
+  log "Checking JSON syntax..."
+  "$PYTHON_BIN" - <<'PY'
+import json
+from pathlib import Path
+
+for path in sorted(Path(".").rglob("*.json")):
+    with path.open(encoding="utf-8") as handle:
+        json.load(handle)
+    print(f"valid json: {path}")
+PY
+elif [ "$STRICT" = "1" ]; then
+  record_failure "python3 or python is required when VALIDATE_STRICT=1"
+else
+  log "Skipping JSON syntax checks; python3 or python was not found."
+fi
+
+if [ "$failures" -ne 0 ]; then
+  log "Validation failed with $failures issue(s)."
+  exit 1
+fi
+
+log "Validation passed."

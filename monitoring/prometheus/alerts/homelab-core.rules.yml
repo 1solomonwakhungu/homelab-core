@@ -1,0 +1,22 @@
+groups:
+  - name: homelab-core.example
+    rules:
+      - alert: PrometheusTargetMissing
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus target is down"
+          description: "Target {{ $labels.instance }} for job {{ $labels.job }} has been down for 5 minutes."
+          runbook_url: "https://github.com/1solomonwakhungu/homelab-core/blob/main/docs/runbooks/observability-no-data.md"
+
+      - alert: BackupSuccessSignalMissing
+        expr: absent(backup_last_success_timestamp_seconds)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backup success signal is missing"
+          description: "No backup success metric is available. Replace this placeholder after the real backup tool is verified."
+          runbook_url: "https://github.com/1solomonwakhungu/homelab-core/blob/main/docs/runbooks/restore-from-backup.md"
